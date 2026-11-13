@@ -30,7 +30,11 @@ namespace Eddie.UI.Cocoa.Osx
 	{
 		#region Constructors
 		// Called when created from unmanaged code
+#if EDDIE_DOTNET
+		public MainWindow(ObjCRuntime.NativeHandle handle) : base(handle)
+#else
 		public MainWindow(IntPtr handle) : base(handle)
+#endif
 		{
 			Initialize();
 		}

@@ -25,7 +25,11 @@ namespace Eddie.UI.Cocoa.Osx
 {
     public partial class WindowUnlock : NSWindow
     {
+#if EDDIE_DOTNET
+        public WindowUnlock(ObjCRuntime.NativeHandle handle) : base(handle)
+#else
         public WindowUnlock(IntPtr handle) : base(handle)
+#endif
         {
         }
 

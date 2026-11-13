@@ -25,7 +25,11 @@ namespace Eddie.UI.Cocoa.Osx
 {
 	public partial class WindowProviderNoBootstrap : NSWindow
 	{
+#if EDDIE_DOTNET
+		public WindowProviderNoBootstrap(ObjCRuntime.NativeHandle handle) : base(handle)
+#else
 		public WindowProviderNoBootstrap(IntPtr handle) : base(handle)
+#endif
 		{
 		}
 

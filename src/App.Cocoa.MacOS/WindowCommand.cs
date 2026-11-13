@@ -25,7 +25,11 @@ namespace Eddie.UI.Cocoa.Osx
 {
 	public partial class WindowCommand : NSWindow
 	{
+#if EDDIE_DOTNET
+		public WindowCommand(ObjCRuntime.NativeHandle handle) : base(handle)
+#else
 		public WindowCommand(IntPtr handle) : base(handle)
+#endif
 		{
 		}
 

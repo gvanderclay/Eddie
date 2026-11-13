@@ -28,7 +28,11 @@ namespace Eddie.UI.Cocoa.Osx
 	{
 		#region Constructors
 		// Called when created from unmanaged code
+#if EDDIE_DOTNET
+		public WindowTextViewer (ObjCRuntime.NativeHandle handle) : base (handle)
+#else
 		public WindowTextViewer (IntPtr handle) : base (handle)
+#endif
 		{
 			Initialize ();
 		}

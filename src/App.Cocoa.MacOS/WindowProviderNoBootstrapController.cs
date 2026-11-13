@@ -29,7 +29,11 @@ namespace Eddie.UI.Cocoa.Osx
         public static WindowProviderNoBootstrapController Singleton = null;
         public Core.Providers.IProvider Provider;
 
+#if EDDIE_DOTNET
+		public WindowProviderNoBootstrapController(ObjCRuntime.NativeHandle handle) : base(handle)
+#else
 		public WindowProviderNoBootstrapController(IntPtr handle) : base(handle)
+#endif
 		{
 		}
 

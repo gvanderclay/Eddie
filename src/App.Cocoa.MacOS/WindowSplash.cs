@@ -7,7 +7,11 @@ namespace Eddie.UI.Cocoa.Osx
 {
     public partial class WindowSplash : NSWindow
     {
+#if EDDIE_DOTNET
+        public WindowSplash(ObjCRuntime.NativeHandle handle) : base(handle)
+#else
         public WindowSplash(IntPtr handle) : base(handle)
+#endif
         {
         }
 

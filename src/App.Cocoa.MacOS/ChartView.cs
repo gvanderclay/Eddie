@@ -61,7 +61,11 @@ namespace Eddie.UI.Cocoa.Osx
 			this.AcceptsTouchEvents = true;
 		}
 
+#if EDDIE_DOTNET
+		public ChartView(ObjCRuntime.NativeHandle handle) : base(handle)
+#else
 		public ChartView(IntPtr handle) : base(handle)
+#endif
 		{
 			Initialize();
 		}

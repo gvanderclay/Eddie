@@ -28,7 +28,11 @@ namespace Eddie.UI.Cocoa.Osx
 	{
 		public string Command = "";
 
+#if EDDIE_DOTNET
+		public WindowCommandController(ObjCRuntime.NativeHandle handle) : base(handle)
+#else
 		public WindowCommandController(IntPtr handle) : base(handle)
+#endif
 		{
 		}
 

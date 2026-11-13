@@ -30,7 +30,11 @@ namespace Eddie.UI.Cocoa.Osx
         public bool AuthFailed = false;
         public string Body = "";
 
+#if EDDIE_DOTNET
+        public WindowUnlockController(ObjCRuntime.NativeHandle handle) : base(handle)
+#else
         public WindowUnlockController(IntPtr handle) : base(handle)
+#endif
         {
         }
 

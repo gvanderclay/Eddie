@@ -32,7 +32,11 @@ namespace Eddie.UI.Cocoa.Osx
 		#region Constructors
 
 		// Called when created from unmanaged code
+#if EDDIE_DOTNET
+		public WindowConnectionRenameController(ObjCRuntime.NativeHandle handle) : base(handle)
+#else
 		public WindowConnectionRenameController(IntPtr handle) : base(handle)
+#endif
 		{
 			Initialize();
 		}

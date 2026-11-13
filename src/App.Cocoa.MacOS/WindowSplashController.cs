@@ -11,7 +11,11 @@ namespace Eddie.UI.Cocoa.Osx
         private Timer m_timer = null;
         private bool m_closePending = false;
 
+#if EDDIE_DOTNET
+        public WindowSplashController(ObjCRuntime.NativeHandle handle) : base(handle)
+#else
         public WindowSplashController(IntPtr handle) : base(handle)
+#endif
         {
         }
 
