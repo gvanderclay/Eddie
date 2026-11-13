@@ -44,7 +44,10 @@ namespace Eddie.UI.Cocoa.Osx
 			// Remember: called program still have uid as normal user. Use setuid().
 
 			// Intentional: legacy Cocoa UI elevated launch only; Eddie3 uses Platform.RunElevated. Retire with legacy UI.
-			result = AuthorizationExecuteWithPrivileges(authReference, toolPath, 0, args, IntPtr.Zero);
+			// The API requires a NULL-terminated argv. Mono's marshaller appends the terminator, .NET's does not.
+			string[] argv = new string[args.Length + 1];
+			Array.Copy(args, argv, args.Length);
+			result = AuthorizationExecuteWithPrivileges(authReference, toolPath, 0, argv, IntPtr.Zero);
 			int resultFree = AuthorizationFree(authReference, AuthorizationFlags.DestroyRights);
 			return (result == 0);
 		}
@@ -121,6 +124,7 @@ namespace Eddie.UI.Cocoa.Osx
 
 		[DllImport(SecurityFramework)]
 		extern static int AuthorizationFree(IntPtr handle, AuthorizationFlags flags);
+
 
 	}
 }
