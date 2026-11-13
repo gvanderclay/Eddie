@@ -78,7 +78,13 @@ if [ "${PROJECT}" = "cli" ] || [ "${LINE}" = "u" ]; then
     fi
 fi
 
-if [ "${PROJECT}" = "ui" ] && [ "${LINE}" = "l" ]; then
+# The legacy UI is built with .NET for macOS on arm64 (native), with Mono/Xamarin.Mac on x64.
+UIDOTNET="no"
+if [ "${PROJECT}" = "ui" ] && [ "${LINE}" = "l" ] && [ "${ARCH}" = "arm64" ]; then
+    UIDOTNET="yes"
+fi
+
+if [ "${PROJECT}" = "ui" ] && [ "${LINE}" = "l" ] && [ "${UIDOTNET}" = "no" ]; then
     if ! [ -x "$(command -v /Library/Frameworks/Mono.framework/Versions/Current/Commands/msbuild)" ]; then
         echo 'Error: msbuild is not installed. Install Mono, Xamarin, VisualStudioForMac.' >&2
         exit 1  
@@ -142,6 +148,11 @@ elif [ $PROJECT = "ui" ]; then
         "${SCRIPTDIR}/../../src/App.UI.MacOS/build.sh" ${CONFIG}
     
         cp -r "${SCRIPTDIR}/../../src/App.UI.MacOS/bin/Eddie.app" .        
+    elif [ "${UIDOTNET}" = "yes" ]; then
+        echo Step: Compile
+        "${SCRIPTDIR}/../../src/macos_clean.sh"
+        dotnet build "${SCRIPTDIR}/../../src/App.Cocoa.MacOS/App.Cocoa.MacOS.net10.csproj" --configuration ${CONFIG} --runtime ${RID}
+        cp -r "${SCRIPTDIR}/../../src/App.Cocoa.MacOS/bin/${CONFIG}/net10.0-macos/${RID}/Eddie-UI.app" "${TARGETDIR}/Eddie.app"
     elif [ "${LINE}" = "l" ]; then
         # Note: libLib.Platform.MacOS.Native.dylib will be in both MacOS (used by Eddie-CLI) and MonoBundle (used by Eddie-UI Xamarin)        
         echo Step: Compile
@@ -214,9 +225,16 @@ echo "Signing"
 "${SCRIPTDIR}/../macos_common/sign.sh" "${TARGETBINDIR}/eddie-cli-elevated-service" no $VARHARDENING
 
 # The CLI is always .NET 10 self-contained (no Mono build): its native dylib lives next to the binary,
-# never in a MonoBundle. The MonoBundle layout only exists for the UI built with Mono (legacy line).
+# never in a MonoBundle. MonoBundle only exists in the legacy UI (Mono runtime, or .NET runtime on arm64).
 if [ "${LINE}" = "u" ] || [ "${PROJECT}" = "cli" ]; then
     "${SCRIPTDIR}/../macos_common/sign.sh" "${TARGETBINDIR}/libLib.Platform.MacOS.Native.dylib" no $VARHARDENING
+elif [ "${UIDOTNET}" = "yes" ]; then
+    # .NET for macOS UI: the CLI copy in MacOS, plus every library in MonoBundle (.NET runtime and our native library).
+    # The SDK signs them ad hoc; with hardened runtime, library validation requires the same Team ID as Eddie-UI.
+    "${SCRIPTDIR}/../macos_common/sign.sh" "${TARGETBINDIR}/libLib.Platform.MacOS.Native.dylib" no $VARHARDENING
+    for DYLIB in "${TARGETBINDIR}/../MonoBundle/"*.dylib; do
+        "${SCRIPTDIR}/../macos_common/sign.sh" "${DYLIB}" no $VARHARDENING
+    done
 else
     "${SCRIPTDIR}/../macos_common/sign.sh" "${TARGETBINDIR}/../MonoBundle/libLib.Platform.MacOS.Native.dylib" no $VARHARDENING
     
