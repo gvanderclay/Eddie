@@ -47,7 +47,14 @@ namespace Eddie.UI.Cocoa.Osx
 			// The API requires a NULL-terminated argv. Mono's marshaller appends the terminator, .NET's does not.
 			string[] argv = new string[args.Length + 1];
 			Array.Copy(args, argv, args.Length);
+#if EDDIE_DOTNET
+			HashSet<int> childrenBefore = GetChildPids();
+#endif
 			result = AuthorizationExecuteWithPrivileges(authReference, toolPath, 0, argv, IntPtr.Zero);
+#if EDDIE_DOTNET
+			if (result == 0)
+				ReapLaunchedChildren(childrenBefore, toolPath);
+#endif
 			int resultFree = AuthorizationFree(authReference, AuthorizationFlags.DestroyRights);
 			return (result == 0);
 		}
@@ -125,6 +132,70 @@ namespace Eddie.UI.Cocoa.Osx
 		[DllImport(SecurityFramework)]
 		extern static int AuthorizationFree(IntPtr handle, AuthorizationFlags flags);
 
+#if EDDIE_DOTNET
+		// AuthorizationExecuteWithPrivileges starts the tool as a direct child of this process
+		// (security_authtrampoline, which then execs the tool), outside System.Diagnostics.Process.
+		// .NET only reaps the children it started itself, so when the elevated helper exits it stays a zombie
+		// and IElevated.Stop waits forever in Process.WaitForExit (shutdown stuck at "Exiting"). Mono reaped it.
+		// Wait on exactly the children created by this call.
+		const string AuthTrampolinePath = "/usr/libexec/security_authtrampoline";
+		const int EINTR = 4;
+
+		static void ReapLaunchedChildren(HashSet<int> childrenBefore, string toolPath)
+		{
+			foreach (int pid in GetChildPids())
+			{
+				if (childrenBefore.Contains(pid))
+					continue;
+
+				// Skip children started meanwhile by other threads through System.Diagnostics.Process:
+				// .NET reaps those, and waiting on them here would take their exit status.
+				string path = GetPidPath(pid);
+				if ((path != AuthTrampolinePath) && (System.IO.Path.GetFileName(path) != System.IO.Path.GetFileName(toolPath)))
+					continue;
+
+				System.Threading.Thread reaper = new System.Threading.Thread(() =>
+				{
+					while ((waitpid(pid, out int _, 0) == -1) && (Marshal.GetLastPInvokeError() == EINTR))
+					{
+					}
+				});
+				reaper.IsBackground = true;
+				reaper.Name = "Elevated reaper " + pid.ToString(System.Globalization.CultureInfo.InvariantCulture);
+				reaper.Start();
+			}
+		}
+
+		static HashSet<int> GetChildPids()
+		{
+			HashSet<int> pids = new HashSet<int>();
+			int[] buffer = new int[4096];
+			if (proc_listchildpids(Environment.ProcessId, buffer, buffer.Length * sizeof(int)) == -1)
+				return pids;
+			foreach (int pid in buffer)
+				if (pid > 0)
+					pids.Add(pid);
+			return pids;
+		}
+
+		static string GetPidPath(int pid)
+		{
+			byte[] buffer = new byte[4096]; // PROC_PIDPATHINFO_MAXSIZE
+			int len = proc_pidpath(pid, buffer, (uint)buffer.Length);
+			if (len <= 0)
+				return "";
+			return System.Text.Encoding.UTF8.GetString(buffer, 0, len);
+		}
+
+		[DllImport("libc")]
+		extern static int proc_listchildpids(int ppid, int[] buffer, int buffersize);
+
+		[DllImport("libc")]
+		extern static int proc_pidpath(int pid, byte[] buffer, uint buffersize);
+
+		[DllImport("libc", SetLastError = true)]
+		extern static int waitpid(int pid, out int status, int options);
+#endif
 
 	}
 }
