@@ -1,0 +1,59 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<!-- .NET for macOS build of the Cocoa UI, native on Apple silicon. Same sources as App.Cocoa.macOS.csproj (Xamarin.Mac,
+	     Mono, x64), which is unchanged; code specific to this build is under #if EDDIE_DOTNET.
+	     Requires the .NET 10 SDK with the macos workload matching the installed Xcode, built on the target arch (no cross-compiling).
+	     Tested: .NET SDK 10.0.404, macos workload 27.2.10000, Xcode 27.2, macOS 27.0.1 on Apple silicon.
+	     Build: dotnet build App.Cocoa.MacOS.net10.csproj -c Release, or repository/macos_portable/build.sh ui arm64 macos-10.15 l
+	     The two projects share bin/obj: run src/macos_clean.sh when switching between them.
+	     Minimum macOS 12.0 (the SDK's floor, not tested below 27); the shared Info.plist keeps 10.9 for the Mono build. -->
+	<PropertyGroup>
+		<TargetFramework>net10.0-macos</TargetFramework>
+		<RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">osx-arm64</RuntimeIdentifier>
+		<SupportedOSPlatformVersion>12.0</SupportedOSPlatformVersion>
+		<OutputType>Exe</OutputType>
+		<RootNamespace>App.Cocoa.MacOS</RootNamespace>
+		<AssemblyName>Eddie-UI</AssemblyName>
+		<OutputPath>bin\$(Configuration)\</OutputPath>
+		<GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+		<ImplicitUsings>disable</ImplicitUsings>
+		<DefineConstants>$(DefineConstants);EDDIE_DOTNET</DefineConstants>
+		<LinkMode>None</LinkMode>
+		<CodesignEntitlements>Entitlements.plist</CodesignEntitlements>
+		<EddieArch>$(RuntimeIdentifier.Replace('osx-', ''))</EddieArch>
+		<!-- Info.plist is shared with the Xamarin.Mac build (LSMinimumSystemVersion 10.9); this build uses a copy, see EddieInfoPlist. -->
+		<AppBundleManifest>$([MSBuild]::NormalizePath('$(MSBuildProjectDirectory)', '$(BaseIntermediateOutputPath)', 'Info.plist'))</AppBundleManifest>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\Lib.Core\Lib.Core.net10.csproj" />
+		<ProjectReference Include="..\Lib.Platform.MacOS\Lib.Platform.MacOS.net10.csproj" />
+	</ItemGroup>
+
+	<!-- Same steps as postbuild.sh of the Xamarin.Mac project, but done before the app bundle is created and signed:
+	     native library, elevated helpers and deploy files (openvpn, wireguard-go...) go in Contents/MacOS. -->
+	<ItemGroup>
+		<NativeReference Include="..\Lib.Platform.MacOS.Native\bin\libLib.Platform.MacOS.Native.dylib" Kind="Dynamic" />
+		<None Include="..\..\deploy\macos_$(EddieArch)\*" PublishFolderType="RootDirectory" CopyToOutputDirectory="PreserveNewest" Link="Contents\MacOS\%(Filename)%(Extension)" />
+	</ItemGroup>
+
+	<!-- The SDK requires LSMinimumSystemVersion to match SupportedOSPlatformVersion and fills it in when missing,
+	     so drop it from the copy. The version is set as in postbuild.sh. -->
+	<Target Name="EddieInfoPlist" BeforeTargets="PrepareForBuild">
+		<Exec Command="/bin/bash &quot;$(MSBuildProjectDirectory)/../../repository/macos_common/get-version.sh&quot;" ConsoleToMSBuild="true" StandardOutputImportance="low">
+			<Output TaskParameter="ConsoleOutput" PropertyName="EddieVersion" />
+		</Exec>
+		<Error Condition="'$(EddieVersion)' == ''" Text="Version is empty" />
+		<Copy SourceFiles="Info.plist" DestinationFiles="$(AppBundleManifest)" />
+		<Exec Command="/usr/libexec/PlistBuddy -c &quot;Delete :LSMinimumSystemVersion&quot; -c &quot;Set :CFBundleShortVersionString $(EddieVersion)&quot; &quot;$(AppBundleManifest)&quot;" />
+	</Target>
+
+	<Target Name="EddieBuildNative" BeforeTargets="BeforeBuild">
+		<Exec Command="/bin/bash &quot;$(MSBuildProjectDirectory)/../Lib.Platform.MacOS.Native/build.sh&quot; $(Configuration)" />
+		<Exec Command="/bin/bash &quot;$(MSBuildProjectDirectory)/../App.CLI.MacOS.Elevated/build.sh&quot; $(Configuration)" />
+		<Exec Command="/bin/bash &quot;$(MSBuildProjectDirectory)/../App.CLI.MacOS.Elevated.Service/build.sh&quot; $(Configuration)" />
+		<ItemGroup>
+			<None Include="..\App.CLI.MacOS.Elevated\bin\eddie-cli-elevated" PublishFolderType="RootDirectory" CopyToOutputDirectory="PreserveNewest" Link="Contents\MacOS\eddie-cli-elevated" />
+			<None Include="..\App.CLI.MacOS.Elevated.Service\bin\eddie-cli-elevated-service" PublishFolderType="RootDirectory" CopyToOutputDirectory="PreserveNewest" Link="Contents\MacOS\eddie-cli-elevated-service" />
+		</ItemGroup>
+	</Target>
+</Project>
